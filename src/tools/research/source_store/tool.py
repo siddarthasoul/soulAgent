@@ -30,7 +30,7 @@ class SourceStore:
     def __init__(
         self,
         root: str = "data/research/cache",
-        corpus_root: str = "data/research/corpus",
+        corpus_root: str = "data/knowledge/research/sources",
     ) -> None:
         self.root = Path(root)
         self.corpus_root = Path(corpus_root)

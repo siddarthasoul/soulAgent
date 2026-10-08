@@ -15,6 +15,10 @@ class Env:
         "OLLAMA_MODEL",
     )
 
+    QDRANT_HOST: str = os.getenv("QDRANT_HOST")
+
+    QDRANT_PORT: int = int(os.getenv("QDRANT_PORT"))
+
     GEMINI_API_KEY: str | None = os.getenv("GEMINI_API_KEY")
 
     GEMINI_IMAGE_MODEL: str = os.getenv(

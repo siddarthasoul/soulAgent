@@ -3,29 +3,30 @@ from common.types.llm import LLMRequest, LLMResponse
 from common.types.research import ResearchResult
 
 from src.providers.base import LLMProvider
-from src.tools.research.tool import ResearchTool
 from src.providers.nvidia import NvidiaProvider
-
+from src.core.context import AgentContext
 
 class ResearchAgent:
 
     def __init__(
         self,
         provider: LLMProvider | None = None,
-        research_tool: ResearchTool | None = None,
     ) -> None:
         self.provider = provider or NvidiaProvider()
-        self.research_tool = research_tool or ResearchTool()
 
     def research(
         self,
         query: str,
         count: int = 5,
         top_k: int = 2,
+        context: AgentContext | None = None,
     ) -> LLMResponse:
 
+        research_tool =  context.tools.get("research")
+        
+
         research_result: ResearchResult = (
-            self.research_tool.research(
+            research_tool.research(
                 query=query,
                 count=count,
                 top_k=top_k,

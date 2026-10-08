@@ -102,6 +102,62 @@ Examples:
 false:
 The request can be answered using existing knowledge or local tools.
 
+
+
+
+==================================================
+4. RAG / INTERNAL KNOWLEDGE
+==================================================
+
+needs_rag:
+
+true:
+The request should use the system's internal knowledge base to
+retrieve relevant information before generating the answer.
+
+Use RAG when:
+
+* The question asks about knowledge that may exist in the local
+  knowledge base.
+* The user asks for an explanation of a technical/educational topic
+  where internal reference material can improve the answer.
+* The request refers to information previously ingested into the
+  system's knowledge base.
+* The answer benefits from grounded internal documentation or
+  domain-specific knowledge.
+
+false:
+The request does not need internal knowledge retrieval.
+
+Examples:
+
+User:
+"Hi"
+
+needs_rag: false
+
+User:
+"What is the attention mechanism?"
+
+needs_rag: true
+
+User:
+"Explain Newton's second law."
+
+needs_rag: true
+
+User:
+"Calculate 2 + 2."
+
+needs_rag: false
+
+User:
+"Research the latest RAG techniques."
+
+needs_rag: false
+
+
+
 ==================================================
 4. PLANNING
 ===========
@@ -477,6 +533,7 @@ The response MUST contain ALL of these fields:
 - query_type
 - complexity
 - needs_search
+- needs_rag
 - needs_planning
 - tasks
 - reason
@@ -522,6 +579,7 @@ The response MUST follow exactly this structure:
   "query_type": "<chat|math|physics|chemistry|research|coding>",
   "complexity": "<simple|complex>",
   "needs_search": false,
+  "needs_rag": true,
   "needs_planning": false,
   "tasks": [
     {
@@ -549,14 +607,16 @@ Example:
 }
 
 Before returning the response, verify that:
-1. All six top-level fields are present.
+
+1. All seven top-level fields are present.
 2. query_type is exactly one allowed domain.
 3. complexity is exactly one allowed value.
 4. needs_search is a boolean.
-5. needs_planning is a boolean.
-6. tasks is a non-empty array.
-7. Every task contains type and query.
-8. The response contains JSON only.
+5. needs_rag is a boolean.
+6. needs_planning is a boolean.
+7. tasks is a non-empty array.
+8. Every task contains type and query.
+9. The response contains JSON only.
 
 
 

@@ -11,6 +11,14 @@ from src.agents.verification.agent import VerificationAgent
 from src.agents.visualization.agent import VisualizationAgent
 from src.dispatcher.dispatcher import Dispatcher
 from src.router.query_router import QueryRouter
+from src.core.context import AgentContext
+from src.tools.calculator.tool import MathTool
+from src.tools.physics.tool import PhysicsTool
+from src.tools.chemistry.tool import ChemistryTool
+from src.tools.research.tool import ResearchTool
+from src.tools.visualization.tool import VisualizationTool
+from src.rag.factory import create_rag_service
+from src.tools.rag.tool import RAGTool
 
 
 class AgentService:
@@ -24,6 +32,9 @@ class AgentService:
         self.research_agent = ResearchAgent()
         self.visualization_agent = VisualizationAgent()
         self.verification_agent = VerificationAgent()
+        self.rag_tool = RAGTool(
+            create_rag_service()
+        )
 
         self.query_router = QueryRouter()
         self.dispatcher = Dispatcher()
@@ -33,11 +44,52 @@ class AgentService:
         user_message: str,
     ) -> ExecutionResult:
 
+        context = AgentContext(
+            request_id=str(uuid4()),
+            user_message=user_message,
+        )
+
+        
+
+        context.tools.register(
+            "rag",
+            self.rag_tool,
+        )
+
+        context.tools.register(
+            "math",
+            MathTool(),
+        )
+
+        context.tools.register(
+            "physics",
+            PhysicsTool(),
+        )
+
+        context.tools.register(
+            "chemistry",
+            ChemistryTool()
+        )
+
+        context.tools.register(
+            "research",
+            ResearchTool(),
+        )
+
+        context.tools.register(
+            "visual",
+            VisualizationTool(),
+        )
+
 
         route = self.query_router.route(user_message)
 
+        context.metadata["route"] = route
+        context.metadata["needs_rag"] = route.needs_rag
 
         dispatch_path = self.dispatcher.dispatch(route)
+
+        context.metadata["dispatch"] = dispatch_path
 
         responses: list[str] = []
         visualization = None
@@ -50,6 +102,7 @@ class AgentService:
                 response, agent = self._run_explanation(
                     query=task.query,
                     query_type=route.query_type,
+                    context=context,
                 )
 
                 responses.append(response)
@@ -60,6 +113,7 @@ class AgentService:
                 response, agent = self._run_calculation(
                     query=task.query,
                     query_type=route.query_type,
+                    context=context,
                 )
 
                 responses.append(response)
@@ -71,6 +125,7 @@ class AgentService:
                     self._run_visualization(
                         query=task.query,
                         query_type=route.query_type,
+                        context=context,
                     )
                 )
 
@@ -81,6 +136,7 @@ class AgentService:
 
                 research_response = self.research_agent.research(
                     query=task.query,
+                    context=context,
                 )
 
                 responses.append(research_response.content)
@@ -94,6 +150,8 @@ class AgentService:
 
 
         response = self._combine_responses(responses)
+
+        context.metadata["agents"] = agents
 
         return ExecutionResult(
             route=route,
@@ -111,23 +169,50 @@ class AgentService:
         self,
         query: str,
         query_type,
+        context: AgentContext,
     ) -> tuple[str, str]:
 
         if query_type.value == "math":
-            return self.math_agent.run(query), "MathAgent"
+            self._prepare_rag(
+                context=context,
+                query=query,
+                category="math",
+            )
+            return self.math_agent.run(query, context=context), "MathAgent"
 
         if query_type.value == "physics":
-            return self.physics_agent.run(query), "PhysicsAgent"
+            self._prepare_rag(
+                context=context,
+                query=query,
+                category="physics",
+            )
+            return self.physics_agent.run(query, context=context), "PhysicsAgent"
 
         if query_type.value == "chemistry":
-            return self.chemistry_agent.run(query), "ChemistryAgent"
 
-        return self.chat_agent.run(query), "ChatAgent"
+            self._prepare_rag(
+                context=context,
+                query=query,
+                category="chemistry",
+            )
+
+           
+            
+            return self.chemistry_agent.run(query, context=context), "ChemistryAgent"
+        
+        self._prepare_rag(
+            context=context,
+            query=query,
+            category="chat",
+        )
+
+        return self.chat_agent.run(query, context=context), "ChatAgent"
 
     def _run_calculation(
         self,
         query: str,
         query_type,
+        context: AgentContext,
     ) -> tuple[str, str]:
 
         for attempt in range(
@@ -136,6 +221,7 @@ class AgentService:
             response, agent = self._run_calculation_once(
                 query=query,
                 query_type=query_type,
+                context=context,
             )
 
             verification = self.verification_agent.verify(
@@ -173,6 +259,7 @@ class AgentService:
         self,
         query: str,
         query_type,
+        context: AgentContext,
     ) -> tuple[str, str]:
 
         if query_type.value == "math":
@@ -181,6 +268,7 @@ class AgentService:
                 self.math_agent.run(
                     query,
                     use_tool=True,
+                    context=context,
                 ),
                 "MathAgent",
             )
@@ -191,6 +279,7 @@ class AgentService:
                 self.physics_agent.run(
                     query,
                     use_tool=True,
+                    context=context,
                 ),
                 "PhysicsAgent",
             )
@@ -201,16 +290,18 @@ class AgentService:
                 self.chemistry_agent.run(
                     query,
                     use_tool=True,
+                    context=context,
                 ),
                 "ChemistryAgent",
             )
 
-        return self.chat_agent.run(query), "ChatAgent"
+        return self.chat_agent.run(query, context=context,), "ChatAgent"
 
     def _run_visualization(
         self,
         query: str,
         query_type,
+        context: AgentContext,
     ) -> tuple[str, str]:
 
         output_dir = Path("outputs")
@@ -226,6 +317,7 @@ class AgentService:
             result = self.chemistry_agent.run(
                 query,
                 use_tool=True,
+                context=context,
             )
 
             return result, "ChemistryAgent"
@@ -233,9 +325,26 @@ class AgentService:
         result = self.visualization_agent.run(
             query=query,
             output_path=visualization_path,
+            context=context,
         )
 
         return str(result), "VisualizationAgent"
+
+
+    def _prepare_rag(self, context: AgentContext, query: str, category: str) -> None:
+        if not context.metadata.get("needs_rag", False):
+            return
+
+        rag_tool = context.tools.get("rag")
+
+        context.metadata["rag_context"] = rag_tool.search(
+            query=query,
+            agent=category,
+            category=category,
+        )
+
+
+
 
     @staticmethod
     def _combine_responses(

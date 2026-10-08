@@ -6,7 +6,7 @@ from common.types.llm import LLMRequest
 
 from src.providers.base import LLMProvider
 from src.providers.ollama import OllamaProvider
-from src.tools.chemistry.tool import ChemistryTool
+from src.core.context import AgentContext
 
 
 class ChemistryAgent:
@@ -15,33 +15,66 @@ class ChemistryAgent:
         self,
         provider: LLMProvider | None = None,
     ) -> None:
-
         self.provider = provider or OllamaProvider()
-        self.chemistry_tool = ChemistryTool()
 
     def run(
         self,
         user_message: str,
         use_tool: bool = False,
+        context: AgentContext | None = None,
     ) -> str:
 
+        chemistry_tool = None
+
+        if context is not None and context.tools.has("chemistry"):
+            chemistry_tool = context.tools.get("chemistry")
+
         if use_tool:
-            task = "Create a valid ChemistryTool request for the user's chemistry task."
+            task = (
+                "Create a valid ChemistryTool request "
+                "for the user's chemistry task."
+            )
         else:
-            task = "Explain the user's chemistry question directly. Do not create a tool request."
+            task = (
+                "Explain the user's chemistry question directly. "
+                "Do not create a tool request."
+            )
+
+        messages = [
+            {
+                "role": "system",
+                "content": CHEMISTRY_AGENT_SYSTEM_PROMPT,
+            }
+        ]
+
+        if not use_tool and context is not None:
+            rag_context = context.metadata.get(
+                "rag_context",
+                "",
+            )
+
+            if rag_context:
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": (
+                            "Use the following internal chemistry "
+                            "knowledge when relevant:\n\n"
+                            f"{rag_context}"
+                        ),
+                    }
+                )
+
+        messages.append(
+            {
+                "role": "user",
+                "content": user_message,
+            }
+        )
 
         request = LLMRequest(
             task=task,
-            messages=[
-                {
-                    "role": "system",
-                    "content": CHEMISTRY_AGENT_SYSTEM_PROMPT,
-                },
-                {
-                    "role": "user",
-                    "content": user_message,
-                },
-            ],
+            messages=messages,
         )
 
         response = self.provider.generate(request)
@@ -49,17 +82,22 @@ class ChemistryAgent:
         if not use_tool:
             return response.content
 
+        if chemistry_tool is None:
+            raise RuntimeError(
+                "Chemistry tool is not available in AgentContext."
+            )
+
         tool_request = self._parse_tool_request(
             response.content
         )
 
         if tool_request.operation == "solve":
-            result = self.chemistry_tool.solve(
+            result = chemistry_tool.solve(
                 **tool_request.arguments
             )
 
         elif tool_request.operation == "visualize":
-            result = self.chemistry_tool.visualize(
+            result = chemistry_tool.visualize(
                 **tool_request.arguments
             )
 
@@ -76,8 +114,10 @@ class ChemistryAgent:
         content: str,
     ) -> ChemistryToolRequest:
 
-        if not isinstance(content, str) or not content.strip(): 
-            raise ValueError( "ChemistryAgent received empty or invalid LLM content." )
+        if not isinstance(content, str) or not content.strip():
+            raise ValueError(
+                "ChemistryAgent received empty or invalid LLM content."
+            )
 
         try:
             data = json.loads(content)

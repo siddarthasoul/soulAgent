@@ -7,7 +7,7 @@ from common.types.physics import PhysicsToolRequest
 
 from src.providers.base import LLMProvider
 from src.providers.ollama import OllamaProvider
-from src.tools.physics.tool import PhysicsTool
+from src.core.context import AgentContext
 
 
 class PhysicsAgent:
@@ -17,35 +17,57 @@ class PhysicsAgent:
         provider: LLMProvider | None = None,
     ) -> None:
         self.provider = provider or OllamaProvider()
-        self.physics_tool = PhysicsTool()
 
     def run(
         self,
         user_message: str,
         use_tool: bool = False,
+        context: AgentContext | None = None,
     ) -> str:
 
+        physics_tool = None
+
+        if context is not None and context.tools.has("physics"):
+            physics_tool = context.tools.get("physics")
+ 
+        
+
         if use_tool:
+
+            if physics_tool is None:
+                raise RuntimeError( "Physics tool is not available in AgentContext." )
+
             tool_request = self._extract_kinematics(user_message)
 
             if tool_request is not None:
-                result = self.physics_tool.solve(
+                result = physics_tool.solve(
                     **tool_request.arguments
                 )
                 return str(result)
 
+        messages = [ { "role": "system", "content": PHYSICS_AGENT_SYSTEM_PROMPT, } ]
+
+        if not use_tool and context is not None:
+            rag_context = context.metadata.get( "rag_context", "", )
+
+            if rag_context:
+                messages.append( { 
+                    "role":
+                      "system", "content":
+                        ( "Use the following internal physics " "knowledge when relevant:\n\n"
+                          f"{rag_context}" ), 
+                          } )
+
+        messages.append( { "role": "user", "content": user_message, } )
+
         request = LLMRequest(
-            task="Solve or explain the user's physics problem.",
-            messages=[
-                {
-                    "role": "system",
-                    "content": PHYSICS_AGENT_SYSTEM_PROMPT,
-                },
-                {
-                    "role": "user",
-                    "content": user_message,
-                },
-            ],
+            task=(
+                "Solve the user's physics problem using a PhysicsTool request."
+                if use_tool
+                else "Explain the user's physics question directly. "
+                    "Do not create a tool request."
+            ),
+            messages=messages
         )
 
         response = self.provider.generate(request)
@@ -57,7 +79,7 @@ class PhysicsAgent:
             response.content
         )
 
-        result = self.physics_tool.solve(
+        result = physics_tool.solve(
             **tool_request.arguments
         )
 

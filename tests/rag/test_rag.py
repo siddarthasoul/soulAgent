@@ -92,10 +92,6 @@ def main() -> None:
 
     print("[4] Creating RAG generator...")
 
-    generator = RAGGenerator(
-        provider=OllamaProvider(),
-    )
-
     relevance_gate = RelevanceGate(min_score=0.0)
     # ------------------------------------------------------------------
     # 5. RAG service
@@ -103,7 +99,6 @@ def main() -> None:
 
     rag = RAGService(
         retriever=retriever,
-        generator=generator,
         relevance_gate=relevance_gate,
     )
 

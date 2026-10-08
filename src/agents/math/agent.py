@@ -6,8 +6,7 @@ from common.types.math import MathToolRequest
 
 from src.providers.base import LLMProvider
 from src.providers.ollama import OllamaProvider
-from src.tools.calculator.tool import MathTool
-
+from src.core.context import AgentContext
 
 class MathAgent:
 
@@ -16,55 +15,78 @@ class MathAgent:
         provider: LLMProvider | None = None,
     ) -> None:
         self.provider = provider or OllamaProvider()
-        self.math_tool = MathTool()
+
 
     def run(
         self,
         user_message: str,
         use_tool: bool = False,
+        context: AgentContext | None = None,
     ) -> str:
+
+        messages = [
+            {
+                "role": "system",
+                "content": MATH_AGENT_SYSTEM_PROMPT,
+            }
+        ]
+
+    # Use prepared RAG context only for explanations.
+        if not use_tool and context is not None:
+            rag_context = context.metadata.get(
+                "rag_context",
+                "",
+            )
+
+            if rag_context:
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": (
+                            "Use the following internal mathematical "
+                            "knowledge when relevant:\n\n"
+                            f"{rag_context}"
+                        ),
+                    }
+                )
+
+        messages.append(
+            {
+                "role": "user",
+                "content": user_message,
+            }
+        )
 
         request = LLMRequest(
             task="Solve or explain the user's mathematical problem.",
-            messages=[
-                {
-                    "role": "system",
-                    "content": MATH_AGENT_SYSTEM_PROMPT,
-                },
-                {
-                    "role": "user",
-                    "content": user_message,
-                },
-            ],
+            messages=messages,
         )
 
         response = self.provider.generate(request)
 
-        # print("MathAgent received response from LLM:")
-        # print(response)
-
-
-
         if not use_tool:
             return response.content
-   
-        # print("=" * 80)
-        # print("MATH AGENT RAW LLM RESPONSE")
-        # print("=" * 80)
-        # print(response.content)
-        # print("=" * 80)
+
+        if context is None or not context.tools.has("math"):
+            raise RuntimeError(
+                "Math tool is not available in AgentContext."
+            )
 
         tool_request = self._parse_tool_request(
             response.content
         )
 
-        result = self.math_tool.run(
+        math_tool = context.tools.get("math")
+
+        result = math_tool.run(
             tool=tool_request.tool,
             operation=tool_request.operation,
             arguments=tool_request.arguments,
         )
 
         return str(result)
+
+
 
     @staticmethod
     def _parse_tool_request(

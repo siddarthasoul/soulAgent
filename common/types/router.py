@@ -35,6 +35,7 @@ class QueryRoute(BaseModel):
     query_type: QueryType
     complexity: Complexity
     needs_search: bool
+    needs_rag: bool
     needs_planning: bool
     tasks: list[QueryTask]
     reason: str

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from src.rag.generation.generator import RAGGenerator
 from src.rag.retrieval.retriever import Retriever
 from src.rag.relevance import RelevanceGate
 
@@ -9,11 +8,9 @@ class RAGService:
     def __init__(
         self,
         retriever: Retriever,
-        generator: RAGGenerator,
         relevance_gate: RelevanceGate,
     ) -> None:
         self.retriever = retriever
-        self.generator = generator
         self.relevance_gate = relevance_gate
 
     def generate(
@@ -41,7 +38,7 @@ class RAGService:
         results = self.relevance_gate.filter(results)
 
         if not results:
-            return "I could not find relevant knowledge for this question."
+            return ""
 
         context_parts = []
 
@@ -64,9 +61,6 @@ class RAGService:
         context = "\n\n".join(context_parts)
 
         if not context:
-            return "I could not find usable knowledge for this question."
+            return ""
 
-        return self.generator.generate(
-            query=query,
-            context=context,
-        )
+        return context

@@ -9,7 +9,8 @@ from common.types.visualization import VisualizationRequest
 
 from src.providers.base import LLMProvider
 from src.providers.ollama import OllamaProvider
-from src.tools.visualization.tool import VisualizationTool
+from src.core.context import AgentContext
+
 
 
 class VisualizationAgent:
@@ -19,13 +20,18 @@ class VisualizationAgent:
         provider: LLMProvider | None = None,
     ) -> None:
         self.provider = provider or OllamaProvider()
-        self.visualization_tool = VisualizationTool()
 
     def run(
         self,
         query: str,
         output_path: str | Path,
+        context: AgentContext,
     ) -> Path:
+
+
+        visualization_tool = context.tools.get("visual")
+
+        
 
         request = LLMRequest(
             task="Create a structured visualization request.",
@@ -47,7 +53,7 @@ class VisualizationAgent:
             response.content
         )
 
-        return self.visualization_tool.run(
+        return visualization_tool.run(
             request=visualization_request,
             output_path=output_path,
         )

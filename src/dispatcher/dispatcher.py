@@ -1,13 +1,17 @@
-from common.types.router import QueryRoute, TaskType
+from common.types.router import QueryRoute
 
 
 class Dispatcher:
 
     def dispatch(self, route: QueryRoute) -> list[str]:
+
         path: list[str] = []
 
         if route.needs_search:
             path.append("search")
+
+        if route.needs_rag:
+            path.append("rag")
 
         if route.needs_planning:
             path.append("planner")

@@ -19,3 +19,5 @@ matplotlib==3.11.2
 pymupdf==1.28.2
 beautifulsoup4==4.15.0
 requests==2.34.2
+
+psycopg[binary,pool]==3.3.6

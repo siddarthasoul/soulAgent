@@ -19,6 +19,8 @@ class Env:
 
     QDRANT_PORT: int = int(os.getenv("QDRANT_PORT"))
 
+    DATABASE_URL: str | None = os.getenv("DATABASE_URL")
+
     GEMINI_API_KEY: str | None = os.getenv("GEMINI_API_KEY")
 
     GEMINI_IMAGE_MODEL: str = os.getenv(

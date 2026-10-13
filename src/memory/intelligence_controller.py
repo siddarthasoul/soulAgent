@@ -278,6 +278,7 @@ class IntelligenceController:
                                 "Learning requires a completed or failed task"
                             )
                         experience = self.experience_analyzer.analyze(
+                            
                             query=task.objective,
                             problem_pattern=problem_pattern,
                             diagnosis=diagnosis,
@@ -294,6 +295,9 @@ class IntelligenceController:
                             metadata={"strategy_id": strategy_id}
                             if strategy_id else {},
                         )
+
+                        if verified:
+                            experience.status = ExperienceStatus.VERIFIED
 
                         self.experience_repository.save(
                             experience,
